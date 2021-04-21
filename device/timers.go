@@ -4,6 +4,9 @@
  *
  * This is based heavily on timers.c from the kernel implementation.
  */
+/* OSMOSE CHANGES
+ * Add isWorking to identify working peers (connected to a peer), allowing to failover peers.
+ */
 
 package device
 
@@ -96,6 +99,12 @@ func expiredRetransmitHandshake(peer *Peer) {
 	} else {
 		atomic.AddUint32(&peer.timers.handshakeAttempts, 1)
 		peer.device.log.Verbosef("%s - Handshake did not complete after %d seconds, retrying (try %d)", peer, int(RekeyTimeout.Seconds()), atomic.LoadUint32(&peer.timers.handshakeAttempts)+1)
+		// FIX automatically disable peer on 5th attempt
+		if atomic.LoadUint32(&peer.timers.handshakeAttempts) == 4 {
+			if peer.isWorking.Swap(false) {
+				peer.device.log.Verbosef("%s - Disabling peer after 5 attempts", peer)
+			}
+		}
 
 		/* We clear the endpoint address src address, in case this is the cause of trouble. */
 		peer.Lock()
@@ -175,7 +184,7 @@ func (peer *Peer) timersAnyAuthenticatedPacketReceived() {
 
 /* Should be called after a handshake initiation message is sent. */
 func (peer *Peer) timersHandshakeInitiated() {
-	if peer.timersActive() {
+	if peer.timersActive() && !peer.timers.retransmitHandshake.IsPending() { // FIX - add IsPending condition
 		peer.timers.retransmitHandshake.Mod(RekeyTimeout + time.Millisecond*time.Duration(rand.Int31n(RekeyTimeoutJitterMaxMs)))
 	}
 }
@@ -188,6 +197,9 @@ func (peer *Peer) timersHandshakeComplete() {
 	atomic.StoreUint32(&peer.timers.handshakeAttempts, 0)
 	peer.timers.sentLastMinuteHandshake.Set(false)
 	atomic.StoreInt64(&peer.stats.lastHandshakeNano, time.Now().UnixNano())
+	// FIX - automaticcaly enable peer
+	peer.device.log.Verbosef("%s - Enabling peer", peer)
+	peer.isWorking.Set(true)
 }
 
 /* Should be called after an ephemeral key is created, which is before sending a handshake response or after receiving a handshake response. */

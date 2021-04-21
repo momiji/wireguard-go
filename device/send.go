@@ -2,6 +2,9 @@
  *
  * Copyright (C) 2017-2021 WireGuard LLC. All Rights Reserved.
  */
+/* OSMOSE CHANGES
+ * Fix dual initiation which continusly reset attempts.
+ */
 
 package device
 
@@ -88,7 +91,7 @@ func (peer *Peer) SendKeepalive() {
 }
 
 func (peer *Peer) SendHandshakeInitiation(isRetry bool) error {
-	if !isRetry {
+	if !isRetry && !peer.timers.retransmitHandshake.IsPending() { // FIX - add IsPending() condition
 		atomic.StoreUint32(&peer.timers.handshakeAttempts, 0)
 	}
 

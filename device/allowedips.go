@@ -2,6 +2,10 @@
  *
  * Copyright (C) 2017-2021 WireGuard LLC. All Rights Reserved.
  */
+/* OSMOSE CHANGES
+ * Replace single peer by a list of peers, to select the first running peer.
+ * Keep peer as it used to manage trie entries, but always set to the latest added peer.
+ */
 
 package device
 
@@ -17,6 +21,7 @@ import (
 type trieEntry struct {
 	child        [2]*trieEntry
 	peer         *Peer
+	peers        []*Peer // FIX
 	bits         net.IP
 	cidr         uint
 	bit_at_byte  uint
@@ -115,13 +120,13 @@ func (node *trieEntry) maskSelf() {
 }
 
 func (node *trieEntry) insert(ip net.IP, cidr uint, peer *Peer) *trieEntry {
-
 	// at leaf
 
 	if node == nil {
 		node := &trieEntry{
 			bits:         ip,
 			peer:         peer,
+			peers:        []*Peer{peer}, // FIX
 			cidr:         cidr,
 			bit_at_byte:  cidr / 8,
 			bit_at_shift: 7 - (cidr % 8),
@@ -136,8 +141,9 @@ func (node *trieEntry) insert(ip net.IP, cidr uint, peer *Peer) *trieEntry {
 	common := commonBits(node.bits, ip)
 	if node.cidr <= cidr && common >= node.cidr {
 		if node.cidr == cidr {
-			node.removeFromPeerEntries()
+			// FIX - node.removeFromPeerEntries()
 			node.peer = peer
+			node.peers = append(node.peers, peer) // FIX
 			node.addToPeerEntries()
 			return node
 		}
@@ -151,6 +157,7 @@ func (node *trieEntry) insert(ip net.IP, cidr uint, peer *Peer) *trieEntry {
 	newNode := &trieEntry{
 		bits:         ip,
 		peer:         peer,
+		peers:        []*Peer{peer}, // FIX
 		cidr:         cidr,
 		bit_at_byte:  cidr / 8,
 		bit_at_shift: 7 - (cidr % 8),
@@ -173,6 +180,7 @@ func (node *trieEntry) insert(ip net.IP, cidr uint, peer *Peer) *trieEntry {
 	parent := &trieEntry{
 		bits:         append([]byte{}, ip...),
 		peer:         nil,
+		peers:        []*Peer{}, // FIX
 		cidr:         cidr,
 		bit_at_byte:  cidr / 8,
 		bit_at_shift: 7 - (cidr % 8),
@@ -186,12 +194,12 @@ func (node *trieEntry) insert(ip net.IP, cidr uint, peer *Peer) *trieEntry {
 	return parent
 }
 
-func (node *trieEntry) lookup(ip net.IP) *Peer {
-	var found *Peer
+func (node *trieEntry) lookup(ip net.IP) *Peer { // FIX to find first running peer
+	var found *trieEntry
 	size := uint(len(ip))
 	for node != nil && commonBits(node.bits, ip) >= node.cidr {
-		if node.peer != nil {
-			found = node.peer
+		if node.peers != nil && len(node.peers) > 0 {
+			found = node
 		}
 		if node.bit_at_byte == size {
 			break
@@ -199,7 +207,15 @@ func (node *trieEntry) lookup(ip net.IP) *Peer {
 		bit := node.choose(ip)
 		node = node.child[bit]
 	}
-	return found
+	if found == nil {
+		return nil
+	}
+	for _, peer := range found.peers {
+		if peer.isWorking.Get() {
+			return peer
+		}
+	}
+	return nil
 }
 
 type AllowedIPs struct {
