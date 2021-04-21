@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2017-2021 WireGuard LLC. All Rights Reserved.
  */
-/* OSMOSE CHANGES
+/* CHANGES
  * Replace single peer by a list of peers, to select the first running peer.
  * Keep peer as it used to manage trie entries, but always set to the latest added peer.
  */

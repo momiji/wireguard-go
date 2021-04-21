@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2017-2021 WireGuard LLC. All Rights Reserved.
  */
-/* OSMOSE CHANGES
+/* CHANGES
  * Add isWorking to identify working peers (connected to a peer), allowing to failover peers.
  */
 

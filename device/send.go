@@ -2,8 +2,8 @@
  *
  * Copyright (C) 2017-2021 WireGuard LLC. All Rights Reserved.
  */
-/* OSMOSE CHANGES
- * Fix dual initiation which continusly reset attempts.
+/* CHANGES
+ * Fix dual initiation which continuously reset attempts.
  */
 
 package device

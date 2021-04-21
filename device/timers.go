@@ -4,7 +4,7 @@
  *
  * This is based heavily on timers.c from the kernel implementation.
  */
-/* OSMOSE CHANGES
+/* CHANGES
  * Add isWorking to identify working peers (connected to a peer), allowing to failover peers.
  */
 
@@ -197,7 +197,7 @@ func (peer *Peer) timersHandshakeComplete() {
 	atomic.StoreUint32(&peer.timers.handshakeAttempts, 0)
 	peer.timers.sentLastMinuteHandshake.Set(false)
 	atomic.StoreInt64(&peer.stats.lastHandshakeNano, time.Now().UnixNano())
-	// FIX - automaticcaly enable peer
+	// FIX - automatically enable peer
 	peer.device.log.Verbosef("%s - Enabling peer", peer)
 	peer.isWorking.Set(true)
 }
